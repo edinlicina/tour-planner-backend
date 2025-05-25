@@ -42,6 +42,9 @@ public class TourService {
 
     public void createTour(CreateTourDto dto) {
         logger.info("Creating a new tour");
+        if (!isCreateTourDtoValid(dto)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
         TourEntity tourEntity = new TourEntity(
                 dto.getName(),
                 dto.getDescription(),
@@ -55,6 +58,27 @@ public class TourService {
         logger.info("Tour created");
     }
 
+    private boolean isCreateTourDtoValid(CreateTourDto dto) {
+        String transportType = dto.getTransportType();
+        if (dto.getName().isEmpty() || dto.getDescription().isEmpty() || dto.getFrom().isEmpty() || dto.getTo().isEmpty() || transportType.isEmpty()) {
+            return false;
+        }
+        if (!"driving-car".equals(transportType) && !"driving-hgv".equals(transportType) && !"cycling-regular".equals(transportType) && !"cycling-mountain".equals(transportType) && !"cycling-electric".equals(transportType) && !"foot-walking".equals(transportType) && !"foot-hiking".equals(transportType)) {
+            return false;
+        }
+        if (dto.getDistance() < 0) {
+            return false;
+        }
+        if (dto.getEstTime() < 0) {
+            return false;
+        }
+        String cityCountryValidationRegex = "^[A-Z][a-zA-ZäöüÄÖÜß\\s'-]+,\\s[A-Z][a-zA-ZäöüÄÖÜß\\s'-]+$";
+        if (!dto.getFrom().matches(cityCountryValidationRegex) || !dto.getTo().matches(cityCountryValidationRegex)) {
+            return false;
+        }
+        return true;
+    }
+
     public void deleteTour(long id) {
         logger.info("Deleting Tour with id " + id);
         tourRepository.deleteById(id);
@@ -63,6 +87,9 @@ public class TourService {
 
     public TourDto updateTour(long id, UpdateTourDto dto) {
         logger.info("Update a Tour with id " + id);
+        if (!isUpdateTourDtoValid(dto)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
         TourEntity tourEntity = tourRepository.findById(id).orElseThrow(() -> {
             logger.error("Tour with id " + id + " was not found in the database");
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Tour not found");
@@ -75,17 +102,38 @@ public class TourService {
         tourEntity.setDescription(dto.getDescription());
         tourEntity.setEstimatedTime(dto.getEstTime());
         tourRepository.save(tourEntity);
-        logger.info("Updated Tour with id "+ id);
+        logger.info("Updated Tour with id " + id);
         return toDto(tourEntity);
 
+    }
+
+    private boolean isUpdateTourDtoValid(UpdateTourDto dto) {
+        String transportType = dto.getTransportType();
+        if (dto.getName().isEmpty() || dto.getDescription().isEmpty() || dto.getFrom().isEmpty() || dto.getTo().isEmpty() || transportType.isEmpty()) {
+            return false;
+        }
+        if (!"driving-car".equals(transportType) && !"driving-hgv".equals(transportType) && !"cycling-regular".equals(transportType) && !"cycling-mountain".equals(transportType) && !"cycling-electric".equals(transportType) && !"foot-walking".equals(transportType) && !"foot-hiking".equals(transportType)) {
+            return false;
+        }
+        if (dto.getDistance() < 0) {
+            return false;
+        }
+        if (dto.getEstTime() < 0) {
+            return false;
+        }
+        String cityCountryValidationRegex = "^[A-Z][a-zA-ZäöüÄÖÜß\\s'-]+,\\s[A-Z][a-zA-ZäöüÄÖÜß\\s'-]+$";
+        if (!dto.getFrom().matches(cityCountryValidationRegex) || !dto.getTo().matches(cityCountryValidationRegex)) {
+            return false;
+        }
+        return true;
     }
 
     private List<TourDto> toDtos(List<TourEntity> entities) {
         return entities.stream().map(entity -> toDto(entity)).toList();
     }
 
-    private List<TourLogDto> toTourLogDtos(List<TourLogEntity> entities){
-        return entities.stream().map(entity->toTourLogDto(entity)).toList();
+    private List<TourLogDto> toTourLogDtos(List<TourLogEntity> entities) {
+        return entities.stream().map(entity -> toTourLogDto(entity)).toList();
     }
 
     private TourLogDto toTourLogDto(TourLogEntity entity) {
@@ -103,21 +151,21 @@ public class TourService {
     private TourDto toDto(TourEntity entity) {
         List<TourLogEntity> tourLogEntities = tourLogRepository.findByTourId(entity.getId());
         float sumOfRatings = 0;
-        for(TourLogEntity tourLogEntity: tourLogEntities){
-            sumOfRatings+=tourLogEntity.getRating();
+        for (TourLogEntity tourLogEntity : tourLogEntities) {
+            sumOfRatings += tourLogEntity.getRating();
         }
         float avgRating = 0;
-        if(!tourLogEntities.isEmpty()){
-            avgRating=sumOfRatings/tourLogEntities.size();
+        if (!tourLogEntities.isEmpty()) {
+            avgRating = sumOfRatings / tourLogEntities.size();
         }
         String popularity = "udefined";
-        if(tourLogEntities.size()>1){
+        if (tourLogEntities.size() > 1) {
             popularity = "low";
         }
-        if(tourLogEntities.size()>=5){
+        if (tourLogEntities.size() >= 5) {
             popularity = "medium";
         }
-        if(tourLogEntities.size()>=10){
+        if (tourLogEntities.size() >= 10) {
             popularity = "popular";
         }
         return new TourDto(
@@ -145,13 +193,16 @@ public class TourService {
             LocalDate localDate = LocalDate.parse(input, formatter);
             return localDate.atStartOfDay();
         } catch (DateTimeParseException e) {
-            logger.error("Invalid date format. Expected: yyyy-MM-dd received "+ input );
+            logger.error("Invalid date format. Expected: yyyy-MM-dd received " + input);
             throw new IllegalArgumentException("Invalid date format. Expected: yyyy-MM-dd");
         }
     }
 
     public TourLogDto createTourLog(Long tourId, CreateTourLogDto dto) {
         logger.info("Creating Tour log for Tour with id " + tourId);
+        if(!isCreateTourLogDtoValid(dto)){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
         TourEntity tourEntity = tourRepository.findById(tourId).orElseThrow(() -> {
             logger.error("Tour with tourId " + tourId + " was not found in the database");
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Tour not found");
@@ -171,19 +222,67 @@ public class TourService {
         return toTourLogDto(created);
     }
 
+    private boolean isCreateTourLogDtoValid(CreateTourLogDto dto) {
+        String difficulty = dto.getDifficulty();
+        if (dto.getComment().isEmpty()) {
+            return false;
+        }
+        //difficulty should be one of the three provided difficulties
+        if (!"Easy".equals(difficulty) && !"Medium".equals(difficulty) && !"Hard".equals(difficulty)) {
+            return false;
+        }
+        //rating should be between 1 and 5
+        if(dto.getRating()<1 || dto.getRating()>5){
+            return false;
+        }
+        //no negative total time
+        if(dto.getTotalTime()<0){
+            return false;
+        }
+        //no negative total distance
+        if(dto.getTotalDistance()<0){
+            return false;
+        }
+        return true;
+    }
+
+    private boolean isUpdateTourLogDtoValid(UpdateTourLogDto dto) {
+        String difficulty = dto.getDifficulty();
+        if (dto.getComment().isEmpty()) {
+            return false;
+        }
+        //difficulty should be one of the three provided difficulties
+        if (!"Easy".equals(difficulty) && !"Medium".equals(difficulty) && !"Hard".equals(difficulty)) {
+            return false;
+        }
+        //rating should be between 1 and 5
+        if(dto.getRating()<1 || dto.getRating()>5){
+            return false;
+        }
+        //no negative total time
+        if(dto.getTotalTime()<0){
+            return false;
+        }
+        //no negative total distance
+        if(dto.getTotalDistance()<0){
+            return false;
+        }
+        return true;
+    }
+
     public void deleteTourLog(Long tourId, Long tourLogId) {
         logger.info("Deleting Tour log with id " + tourLogId + " for tour with id " + tourId);
         TourLogEntity tourLogEntity = tourLogRepository.findById(tourLogId).orElseThrow(() -> {
-           logger.error("Tour Log with id "+ tourLogId +"was not found in Database" );
-           return new ResponseStatusException(HttpStatus.NOT_FOUND, "Tour Log not found");
-       });
-       if(tourLogEntity.getTour().getId().longValue() != tourId.longValue()){
-           logger.error("Tour Id "+ tourLogEntity.getTour().getId() + " of Tour Log doesn't match given Tour Id "+tourId);
-           throw new ResponseStatusException(
-                   HttpStatus.NOT_FOUND,
-                   "Tour Id of Tour Log doesn't match given Tour Id"
-           );
-       }
+            logger.error("Tour Log with id " + tourLogId + "was not found in Database");
+            return new ResponseStatusException(HttpStatus.NOT_FOUND, "Tour Log not found");
+        });
+        if (tourLogEntity.getTour().getId().longValue() != tourId.longValue()) {
+            logger.error("Tour Id " + tourLogEntity.getTour().getId() + " of Tour Log doesn't match given Tour Id " + tourId);
+            throw new ResponseStatusException(
+                    HttpStatus.NOT_FOUND,
+                    "Tour Id of Tour Log doesn't match given Tour Id"
+            );
+        }
         tourLogRepository.deleteById(tourLogId);
         logger.info("Tour log with id " + tourLogId + " for tour with id " + tourId + " deleted");
     }
@@ -195,13 +294,16 @@ public class TourService {
     }
 
     public TourLogDto updateTourLog(Long tourId, Long tourLogId, UpdateTourLogDto dto) {
-        logger.info("Updating Tour log with Id "+ tourLogId +" for Tour with Tour with Id "+ tourId);
+        logger.info("Updating Tour log with Id " + tourLogId + " for Tour with Tour with Id " + tourId);
+        if(!isUpdateTourLogDtoValid(dto)){
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
+        }
         TourLogEntity tourLogEntity = tourLogRepository.findById(tourLogId).orElseThrow(() -> {
-            logger.error("Tour Log with id "+ tourLogId +"was not found in Database" );
+            logger.error("Tour Log with id " + tourLogId + "was not found in Database");
             return new ResponseStatusException(HttpStatus.NOT_FOUND, "Tour Log not found");
         });
-        if(tourLogEntity.getTour().getId().longValue() != tourId.longValue()){
-            logger.error("Tour Id "+ tourLogEntity.getTour().getId() + " of Tour Log doesn't match given Tour Id "+tourId);
+        if (tourLogEntity.getTour().getId().longValue() != tourId.longValue()) {
+            logger.error("Tour Id " + tourLogEntity.getTour().getId() + " of Tour Log doesn't match given Tour Id " + tourId);
             throw new ResponseStatusException(
                     HttpStatus.NOT_FOUND,
                     "Tour Id of Tour Log doesn't match given Tour Id"
@@ -215,7 +317,7 @@ public class TourService {
         tourLogEntity.setTotalTime(dto.getTotalTime());
         tourLogEntity.setRating(dto.getRating());
         tourLogRepository.save(tourLogEntity);
-        logger.info("Tour log with Id "+ tourLogId +" for Tour with Tour with Id "+ tourId + " updated");
+        logger.info("Tour log with Id " + tourLogId + " for Tour with Tour with Id " + tourId + " updated");
         return toTourLogDto(tourLogEntity);
     }
 
@@ -239,7 +341,7 @@ public class TourService {
                 document.add(new Paragraph("Distance: " + tour.getDistance() + " km"));
                 document.add(new Paragraph("Estimated Time: " + tour.getEstimatedTime() + " h"));
                 document.add(new Paragraph("----------------------------------------"));
-                for(TourLogEntity tourLogEntity: tourLogEntities){
+                for (TourLogEntity tourLogEntity : tourLogEntities) {
                     document.add(new Paragraph("Comment: " + tourLogEntity.getComment()));
                     document.add(new Paragraph("Date/Time: " + tourLogEntity.getDateTime()));
                     document.add(new Paragraph("Difficulty: " + tourLogEntity.getDifficulty()));
