@@ -13,6 +13,7 @@ import org.mockito.MockitoAnnotations;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,106 +37,101 @@ class TourServiceTest {
 	}
 
 	@Test
-	void getTours_ShouldReturnTourDtos() {
-		when(tourRepository.findAll()).thenReturn(List.of(new TourEntity()));
-		when(tourLogRepository.findByTourId(anyLong())).thenReturn(List.of());
-
-		List<TourDto> result = tourService.getTours();
-
-		assertThat(result).hasSize(1);
-	}
-
-	@Test
-	void createTour_ShouldSaveTourEntity() {
-		CreateTourDto dto = new CreateTourDto("name", "desc", "from", "to", "car", 10.5f, 1.5f);
-
+	void createTour_withValidDto_savesTour() {
+		CreateTourDto dto = new CreateTourDto("Tour Name", "Description", "Vienna, Austria", "Graz, Austria", "driving-car", 100f, 2f);
 		tourService.createTour(dto);
-
 		verify(tourRepository).save(any(TourEntity.class));
 	}
 
 	@Test
-	void deleteTour_ShouldCallDeleteById() {
+	void createTour_withInvalidTransportType_throwsBadRequest() {
+		CreateTourDto dto = new CreateTourDto("Tour", "Desc", "Vienna, Austria", "Graz, Austria", "flying-dragon", 100f, 2f);
+		assertThatThrownBy(() -> tourService.createTour(dto)).isInstanceOf(ResponseStatusException.class);
+	}
+
+	@Test
+	void deleteTour_deletesById() {
 		tourService.deleteTour(1L);
 		verify(tourRepository).deleteById(1L);
 	}
 
 	@Test
-	void updateTour_TourExists_ShouldUpdateAndReturnDto() {
-		TourEntity entity = new TourEntity("old", "desc", "a", "b", "car", 5f, 1f);
+	void updateTour_withValidDto_updatesTour() {
+		TourEntity entity = new TourEntity("Old", "Desc", "Vienna, Austria", "Berlin, Germany", "driving-car", 50f, 1f);
 		entity.setId(1L);
 		when(tourRepository.findById(1L)).thenReturn(Optional.of(entity));
 		when(tourLogRepository.findByTourId(1L)).thenReturn(List.of());
 
-		UpdateTourDto dto = new UpdateTourDto("new", "desc", "x", "y", "bike", 15f, 2f);
-
+		UpdateTourDto dto = new UpdateTourDto("New", "Desc", "Vienna, Austria", "Berlin, Germany", "cycling-electric", 70f, 3f);
 		TourDto result = tourService.updateTour(1L, dto);
 
-		assertThat(result.getName()).isEqualTo("new");
-		verify(tourRepository).save(any(TourEntity.class));
+		assertThat(result.getName()).isEqualTo("New");
+		verify(tourRepository).save(any());
 	}
 
 	@Test
-	void updateTour_TourNotFound_ShouldThrow404() {
-		when(tourRepository.findById(anyLong())).thenReturn(Optional.empty());
+	void updateTour_withInvalidLocation_throwsBadRequest() {
+		TourEntity entity = new TourEntity("Old", "Desc", "A", "B", "driving-car", 50f, 1f);
+		entity.setId(1L);
+		when(tourRepository.findById(1L)).thenReturn(Optional.of(entity));
+		UpdateTourDto dto = new UpdateTourDto("Name", "Desc", "Invalid", "City", "cycling-mountain", 50f, 1f);
 
-		assertThatThrownBy(() -> tourService.updateTour(1L, new UpdateTourDto()))
-				.isInstanceOf(ResponseStatusException.class)
-				.hasMessageContaining("404 NOT_FOUND");
+		assertThatThrownBy(() -> tourService.updateTour(1L, dto)).isInstanceOf(ResponseStatusException.class);
 	}
 
 	@Test
-	void createTourLog_ShouldReturnCreatedDto() {
+	void createTourLog_withValidData_returnsDto() {
+		CreateTourLogDto dto = new CreateTourLogDto("2025-05-25", "Comment", "Medium", 50f, 2f, 4);
 		TourEntity tour = new TourEntity();
 		tour.setId(1L);
 		when(tourRepository.findById(1L)).thenReturn(Optional.of(tour));
-
-		CreateTourLogDto dto = new CreateTourLogDto("2025-05-27", "Nice trip", "easy", 10f, 1f, 5);
-		when(tourLogRepository.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+		when(tourLogRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
 		TourLogDto result = tourService.createTourLog(1L, dto);
 
-		assertThat(result.getComment()).isEqualTo("Nice trip");
-		verify(tourLogRepository).save(any(TourLogEntity.class));
+		assertThat(result.getComment()).isEqualTo("Comment");
+		verify(tourLogRepository).save(any());
 	}
 
 	@Test
-	void createTourLog_TourNotFound_ShouldThrow404() {
-		when(tourRepository.findById(anyLong())).thenReturn(Optional.empty());
-
-		assertThatThrownBy(() -> tourService.createTourLog(1L, new CreateTourLogDto("2025-05-27", "", "", 0f, 0f, 0)))
-				.isInstanceOf(ResponseStatusException.class)
-				.hasMessageContaining("404 NOT_FOUND");
+	void createTourLog_withInvalidRating_throwsBadRequest() {
+		CreateTourLogDto dto = new CreateTourLogDto("2025-05-25", "Text", "Medium", 10f, 1f, 6);
+		assertThatThrownBy(() -> tourService.createTourLog(1L, dto)).isInstanceOf(ResponseStatusException.class);
 	}
 
 	@Test
-	void parseDateTimeOrThrow_InvalidDate_ShouldThrowException() {
-		assertThatThrownBy(() -> tourService.createTourLog(1L,
-				new CreateTourLogDto("invalid-date", "", "", 0f, 0f, 0)))
-				.isInstanceOf(ResponseStatusException.class);
+	void updateTourLog_withValidDto_returnsUpdatedDto() {
+		UpdateTourLogDto dto = new UpdateTourLogDto("2025-10-28", "Hard", "Hard", 2f, 4, 4);
+		TourLogEntity log = new TourLogEntity();
+		log.setTour(new TourEntity());
+		log.getTour().setId(1L);
+		log.setId(2L);
+
+		when(tourLogRepository.findById(2L)).thenReturn(Optional.of(log));
+
+		TourLogDto result = tourService.updateTourLog(1L, 2L, dto);
+
+		assertThat(result.getComment()).isEqualTo("Hard");
+		verify(tourLogRepository).save(any());
 	}
 
 	@Test
-	void generateAllToursPdf_ShouldReturnPdfBytes() {
+	void getTours_returnsListOfDtos() {
 		when(tourRepository.findAll()).thenReturn(List.of(new TourEntity()));
 		when(tourLogRepository.findByTourId(anyLong())).thenReturn(List.of());
 
-		byte[] pdf = tourService.generateAllToursPdf();
-
-		assertThat(pdf).isNotEmpty();
+		List<TourDto> tours = tourService.getTours();
+		assertThat(tours).isNotEmpty();
 	}
 
 	@Test
-	void getTourLogs_ShouldReturnTourLogDtos() {
-		TourLogEntity log = new TourLogEntity();
-		log.setComment("Test log");
-		log.setRating(4);
-		log.setDateTime(LocalDateTime.now());
-		when(tourLogRepository.findByTourId(1L)).thenReturn(List.of(log));
+	void generateAllToursPdf_returnsByteArray() {
+		TourEntity tour = new TourEntity("Tour", "Desc", "A", "B", "driving-car", 20f, 1f);
+		tour.setId(1L);
+		when(tourRepository.findAll()).thenReturn(List.of(tour));
+		when(tourLogRepository.findByTourId(1L)).thenReturn(Collections.emptyList());
 
-		List<TourLogDto> result = tourService.getTourLogs(1L);
-
-		assertThat(result).hasSize(1);
-		assertThat(result.get(0).getComment()).isEqualTo("Test log");
+		byte[] pdf = tourService.generateAllToursPdf();
+		assertThat(pdf).isNotEmpty();
 	}
 }

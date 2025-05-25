@@ -43,7 +43,10 @@ public class TourLogEntity {
         this.tour = tour;
     }
 
-    // --- Getters and Setters ---
+    public void setId(Long id) {
+        this.id = id;
+    }
+// --- Getters and Setters ---
 
     public Long getId() { return id; }
 
@@ -67,4 +70,6 @@ public class TourLogEntity {
 
     public TourEntity getTour() { return tour; }
     public void setTour(TourEntity tour) { this.tour = tour; }
+
+
 }
