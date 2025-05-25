@@ -158,7 +158,7 @@ public class TourService {
         if (!tourLogEntities.isEmpty()) {
             avgRating = sumOfRatings / tourLogEntities.size();
         }
-        String popularity = "udefined";
+        String popularity = "undefined";
         if (tourLogEntities.size() > 1) {
             popularity = "low";
         }
